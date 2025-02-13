@@ -1,10 +1,13 @@
 #include <Arduino.h>
 #include "pab.h"
+#include "noblock_led.h"
 
 #define PIN_INPUT     T0    //GPIO used as input signal - must chose between touch pin of the board (EX: T0, T1, etc..)
 #define PIN_LED       22
 
 Trigger trigger (PIN_INPUT);      //class meant to simplify recursive action, and clean main
+nb_led led (PIN_LED);             //class to control led toggle without blocking the code
+
 int value = 0;                    //last value measured
 bool KeptTouch = false;           //bool used to track hold touch
 
@@ -12,12 +15,11 @@ unsigned long StartMillis1;       //first timer -- sampling speed
 const int Period1 = 100;
 unsigned long StartMillis2;       //second timer -- how many millis before adapting trigger level
 const int Period2 = 5000;
-bool LightUp = true;
+bool LightUp = false;
 
 void setup(){
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
-  digitalWrite(PIN_LED, LOW);
 
   trigger.initialize();
   Serial.printf("Initialized as follow:");   //debug
@@ -28,7 +30,9 @@ void setup(){
 
 void loop(){
 
-if (millis() < StartMillis1 || millis() < StartMillis2){    //protection against Millis() value reset
+  led.run() ;                                                 //needed to perform led dimming after toggling
+
+  if (millis() < StartMillis1 || millis() < StartMillis2){    //protection against Millis() value reset
     StartMillis1 = 0;
     StartMillis2 = 0;
   }
@@ -50,13 +54,15 @@ if (millis() < StartMillis1 || millis() < StartMillis2){    //protection against
   }
 
   if (trigger.touch () == true && KeptTouch == false) {       //condiotion to do action on press (1 time after pressed)
-    StartMillis2 = millis();
+    StartMillis2 = millis();                                  //setting up start time for "trigger reset" timer
     KeptTouch = true;
     Serial.printf("Touched!!!");        //debug
 
     //===========  Put Here the list of action to do on press  ============//
-    {
     LightUp = !LightUp;
+    led.toggle( LightUp );
+
+    /*{
     if (LightUp == false) {
       for(int dutyCycle = 0; dutyCycle <= 80; dutyCycle++){   
         // changing the LED brightness with PWM
@@ -81,7 +87,7 @@ if (millis() < StartMillis1 || millis() < StartMillis2){    //protection against
         delay(3);
       }
     }
-  }
+    }*/
   }
 
   if (trigger.touch () == false && KeptTouch == true) {       //condition to do actions on release
